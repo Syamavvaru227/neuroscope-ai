@@ -4,6 +4,10 @@
 
 NEUROSCOPE AI is a research and demonstration prototype for helping healthcare professionals organize evolving neurological cases, view a chronological timeline, review potential red flags, inspect linked literature, and identify unresolved questions. Autoimmune encephalitis is the primary example, with synthetic infectious and other neurological mimics.
 
+## Problem and approach
+
+Early neurological presentations can evolve while initial investigations are inconclusive. This prototype brings documented symptoms, examination findings, investigations, and pending questions into one chronological review, so a qualified clinician can inspect how the evidence changes over time. It does not determine a diagnosis or replace specialist assessment.
+
 > **Clinical safety:** This prototype is not clinically validated and must not be used to diagnose, rule out disease, prescribe or change treatment, or replace qualified medical judgment. Use fictional synthetic data only. Do not enter personal health information.
 
 ## What the demo includes
@@ -23,6 +27,20 @@ The hero uses a Three.js procedural, brain-inspired 3D illustration. It is not a
 - Frontend: React, TypeScript, Vite, Three.js, React Three Fiber
 - Backend: FastAPI, Pydantic, optional Groq chat completion
 - Storage: process memory only; synthetic demo cases are initialized at startup
+
+## Architecture
+
+```mermaid
+flowchart LR
+  Clinician[Clinician reviewing synthetic case] --> UI[React + TypeScript workspace]
+  UI -->|/api requests| API[FastAPI + Pydantic]
+  API --> Rules[Deterministic criteria and red-flag engine]
+  API --> Evidence[Curated reference metadata]
+  API --> Demo[In-memory synthetic cases]
+  API -. optional summary only .-> Groq[Groq API when configured]
+```
+
+The UI can use its bundled synthetic fallback examples when the API is offline. The backend provides the same-origin API and, for the Docker/Cloud Run build, serves the compiled frontend. No patient database or account system is implemented.
 
 ## Repository layout
 
@@ -92,10 +110,11 @@ cd frontend
 npm run lint
 npm run build
 cd ..
+python -m unittest discover -s backend -p "test_*.py" -v
 python test_suite.py
 ```
 
-The smoke suite expects the frontend at `http://127.0.0.1:5173` and API at `http://127.0.0.1:8000/api`; override with `NEUROSCOPE_FRONTEND_URL` and `NEUROSCOPE_API_URL`. It checks the health, case list, analysis, evidence, and timeline sorting endpoints using only a synthetic case.
+The unit tests use FastAPI's in-process test client and only synthetic data. The separate live smoke suite expects the frontend at `http://127.0.0.1:5173` and API at `http://127.0.0.1:8000/api`; override with `NEUROSCOPE_FRONTEND_URL` and `NEUROSCOPE_API_URL`. It checks the health, case list, analysis, evidence, and timeline sorting endpoints.
 
 ## Deploy to Google Cloud Run
 
@@ -110,6 +129,14 @@ gcloud run deploy neuroscope-ai --source . --region REGION --allow-unauthenticat
 
 3. Wait for deployment to finish, then open the service URL printed by `gcloud`. Confirm the home page loads and `<service-url>/api/health` reports `healthy`. Add that actual URL to the submission form only after validating it.
 4. Leave the Groq key unset for deterministic-only operation. If you configure it, add it through Cloud Run's secret/environment configuration and use synthetic data only.
+
+Deployment references: [Cloud Run deploy from source](https://cloud.google.com/run/docs/deploying-source-code) · [Cloud Run pricing](https://cloud.google.com/run/pricing). This repository does not currently have a deployed application URL; add one here only after an actual deployment has been verified.
+
+### Optional: deploy frontend and API separately to Vercel
+
+Vercel deployments use two projects for this repository: set the frontend project root to `frontend` (Vite build command `npm run build`, output `dist`) and the API project root to `backend` (FastAPI entry point `main.py`). Deploy the frontend first to obtain its origin. In the backend project's environment, set `CORS_ORIGINS` to that exact frontend origin, then deploy the API. Finally set the frontend's build-time `VITE_API_BASE_URL` to `https://<api-domain>/api` and redeploy the frontend. Keep preview origins separately scoped if previews need API access; do not use `*` for credentialed or private deployments. Confirm the frontend and `/api/health` endpoint after deployment.
+
+References: [Vercel Python runtime](https://vercel.com/docs/functions/runtimes/python) · [Deploying with the Vercel CLI](https://vercel.com/docs/cli/deploying-from-cli). Vercel functions have ephemeral in-memory state, so saved cases are not durable and separate instances may not share updates. Use this path for the synthetic demo only until persistent storage and access controls exist.
 
 Before external use, configure persistence, authentication and authorization, privacy controls, monitoring, security review, clinical validation, and the applicable regulatory process. They are not implemented here.
 

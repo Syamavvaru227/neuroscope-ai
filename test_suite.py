@@ -26,7 +26,25 @@ with httpx.Client(timeout=15.0) as client:
     assert analysis.status_code == 200
     review = analysis.json()
     assert review.get("engine_source") and review.get("citations")
+    assert review.get("uncertainty_statement") and review.get("safety_disclaimer")
     print("[PASS] Deterministic analysis contract")
+
+    invalid_analysis = client.post(f"{API}/analyze", json={"age": "not-an-integer"})
+    assert invalid_analysis.status_code == 422
+    print("[PASS] Invalid analysis field returns 422")
+
+    malformed_json = client.post(
+        f"{API}/analyze",
+        content="{",
+        headers={"Content-Type": "application/json"},
+    )
+    assert malformed_json.status_code == 422
+    print("[PASS] Malformed JSON returns 422")
+
+    missing_case = client.get(f"{API}/cases/NO-SUCH-SYNTHETIC-CASE")
+    assert missing_case.status_code == 404
+    assert missing_case.json().get("detail") == "Clinical case not found"
+    print("[PASS] Unknown case returns 404")
 
     # Re-submit only the exact canonical synthetic timeline to exercise sorting.
     # This creates no test event or treatment recommendation.
